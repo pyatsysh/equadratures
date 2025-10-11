@@ -63,8 +63,8 @@ class Induced(Sampling):
         # TODO add a total order index set with random samples
         # The above would be necessary in higher dimensions
         # Randomly sample index-set for each quadrature point
-        print('_set_points')
-        print(ray_imported)
+        #print('_set_points')
+        #print(ray_imported)
         if ray_imported:
             ray.init()
         else:
@@ -89,7 +89,7 @@ class Induced(Sampling):
                 max_order
                 )
         #print(quadrature_points)
-        print('done!')
+        #print('done!')
         if ray_imported:
             ray.shutdown()
         else:
@@ -135,8 +135,8 @@ class Induced(Sampling):
                     parameter,
                     sampled_cdf_values,
                     order)
-            print('i am here!')
-            print(ray_imported)
+            #print('i am here!')
+            #print(ray_imported)
             if ray_imported:
                 inverse_cdf_values = ray.get(inverse_cdf_values)
                 quadrature_points[variable_positions] = inverse_cdf_values

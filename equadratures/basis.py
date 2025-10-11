@@ -305,7 +305,7 @@ def total_order_basis(orders):
         total_order = np.vstack((total_order, R))
     
     # Now, as we expect the order to be 
-    total_order = total_order[np.sum(total_order, axis=0) <= highest_order]
+    total_order = total_order[np.sum(total_order, axis=1) <= highest_order]
     return total_order
 
 def sparse_grid_basis(level, growth_rule, dimensions):
