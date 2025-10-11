@@ -149,7 +149,7 @@ class Correlations(object):
             self.corrected_poly._set_points_and_weights()
 
             P = self.corrected_poly.get_poly(self.corrected_poly._quadrature_points)
-            W = np.mat(np.diag(np.sqrt(self.corrected_poly._quadrature_weights)))
+            W = np.asmatrix(np.diag(np.sqrt(self.corrected_poly._quadrature_weights)))
             A = W * P.T
             self.corrected_poly.A = A
             self.corrected_poly.P = P

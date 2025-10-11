@@ -249,7 +249,7 @@ class ParentParameter(object):
             idx = D.argsort()[::-1]
             eigs = D[idx]
             eigVecs = V[:, idx]
-            #V = np.mat(V) # convert to matrix
+            #V = np.asmatrix(V) # convert to matrix
             #i = np.argsort(D) # get the sorted indices
             #i = np.array(i) # convert to array
             #V = V[:,i]
@@ -405,7 +405,7 @@ def get_local_quadrature(self, order=None, ab=None):
         # Compute eigenvalues & eigenvectors of Jacobi matrix
         #D,V = np.linalg.eig(JacobiMat)
         D, V = sc.linalg.eigh(JacobiMat)
-        #V = np.mat(V) # convert to matrix
+        #V = np.asmatrix(V) # convert to matrix
         #local_points = np.sort(D) # sort by the eigenvalues
         #i = np.argsort(D) # get the sorted indices
         #i = np.array(i) # convert to array
