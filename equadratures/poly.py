@@ -347,7 +347,7 @@ class Poly(object):
         quadrature_points, quadrature_weights = self.quadrature.get_points_and_weights()
         if self.subsampling_algorithm_name is not None:
             P = self.get_poly(quadrature_points)
-            W = np.mat( np.diag(np.sqrt(quadrature_weights)))
+            W = np.asmatrix( np.diag(np.sqrt(quadrature_weights)))
             A = W * P.T
             self.A = A
             self.P = P
@@ -360,7 +360,7 @@ class Poly(object):
             self._quadrature_points = quadrature_points
             self._quadrature_weights = quadrature_weights
             P = self.get_poly(quadrature_points)
-            W = np.mat( np.diag(np.sqrt(quadrature_weights)))
+            W = np.asmatrix( np.diag(np.sqrt(quadrature_weights)))
             A = W * P.T
             self.A = A
             self.P = P
@@ -1105,7 +1105,7 @@ def evaluate_model_gradients(points, fungrad, format='matrix'):
             for j in range(0, dimensions):
                 grad_values[counter, 0] = output_from_gradient_call[j]
                 counter = counter + 1
-        return np.mat(grad_values)
+        return np.asmatrix(grad_values)
     else:
         raise ValueError( 'evalgradients(): Format must be either matrix or vector!')
 
@@ -1167,5 +1167,5 @@ def cell2matrix(G, W):
             for k in range(0,cols):
                 BigC[counter,k] = K[j,k]
             counter = counter + 1
-    BigC = np.mat(BigC)
+    BigC = np.asmatrix(BigC)
     return BigC
