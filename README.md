@@ -6,9 +6,8 @@ _equadratures_ is an open-source library for _uncertainty quantification_, _mach
 
 ## Code
 
-The latest version of the code is v10 _Baby Blue_, released March 2022.
+The latest version of the code is accessible on [PyPI](https://pypi.org/project/equadratures/).
 
-![](https://travis-ci.com/equadratures/equadratures.svg?branch=master)
 [![](https://coveralls.io/repos/github/equadratures/equadratures/badge.svg?branch=master)](https://coveralls.io/github/equadratures/equadratures)
 [![](https://badge.fury.io/py/equadratures.svg)](https://pypi.org/project/equadratures/)
 [![](https://joss.theoj.org/papers/10.21105/joss.00166/status.svg)](https://joss.theoj.org/papers/10.21105/joss.00166)
