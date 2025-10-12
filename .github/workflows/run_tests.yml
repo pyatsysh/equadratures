@@ -46,7 +46,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install nose2 cvxpy setuptools coveralls numexpr pymanopt
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          python setup.py install
+          pip install .
       - name: Test
         run: |
           coverage run --source=tests -m nose2
