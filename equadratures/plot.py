@@ -844,7 +844,7 @@ def plot_polyfit_1D(Polynomial, ax=None, uncertainty=True, output_variances=None
     ax.plot(Xi, y, '-',label='Polynomial fit', color='navy')
     ax.plot(X.flatten(), y_truth.flatten(), 'o', color='dodgerblue', ms=10, markeredgecolor='k',lw=1, alpha=0.6, label='Data')
     if uncertainty:
-        ax.fill_between(Xi.flatten(), y+ystd, y-ystd, alpha=.10, color='deepskyblue',label='Polynomial $\sigma$')
+        ax.fill_between(Xi.flatten(), y+ystd, y-ystd, alpha=.10, color='deepskyblue',label=r'Polynomial $\sigma$')
     ax.legend()
     sns.despine(offset=10, trim=True)
     if show:
