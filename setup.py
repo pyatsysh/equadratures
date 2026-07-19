@@ -23,7 +23,7 @@ setup(name='equadratures',
       url='https://github.com/Effective-Quadratures/equadratures',
       author='Developers',
       license='LPGL-2.1',
-      packages=['equadratures', 'equadratures.distributions', 'equadratures.sampling_methods'],
+      packages=['equadratures', 'equadratures.distributions', 'equadratures.sampling_methods', 'equadratures.jax'],
       install_requires=[
           'numpy',
           'scipy >= 0.15.0',
@@ -33,6 +33,7 @@ setup(name='equadratures',
           'graphviz'
       ],
       extras_require={
+          "jax": ['jax>=0.4'],
           "cvxpy":  ['cvxpy>=1.1'],
           "networkx":  ['networkx==2.6.3'],
           "torch" : ['torch>=1.7.0'],
