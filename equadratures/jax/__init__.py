@@ -30,6 +30,7 @@ from equadratures.jax.basis import (
     design_matrix,
 )
 from equadratures.jax.poly import Poly, tensor_quadrature
+from equadratures.jax.parameter import Parameter
 
 __all__ = [
     "jacobi_matrix",
@@ -44,4 +45,5 @@ __all__ = [
     "design_matrix",
     "Poly",
     "tensor_quadrature",
+    "Parameter",
 ]

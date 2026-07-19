@@ -74,6 +74,19 @@ class Poly:
         self.coefficients = jnp.linalg.lstsq(A, jnp.asarray(y), rcond=None)[0]
         return self.coefficients
 
+    def fit_ridge(self, X, y, regularisation):
+        """Tikhonov / ridge-regularised least squares (differentiable).
+
+        Solves ``(AᵀA + reg·I) c = Aᵀy``. Useful when the design is
+        ill-conditioned or under-determined; ``regularisation`` is itself a
+        differentiable input (e.g. a learnable hyper-parameter).
+        """
+        A = self.get_design(X)
+        n = A.shape[1]
+        gram = A.T @ A + regularisation * jnp.eye(n)
+        self.coefficients = jnp.linalg.solve(gram, A.T @ jnp.asarray(y))
+        return self.coefficients
+
     def fit_projection(self, X, y, weights):
         """Spectral projection ``c_k = sum_q w_q y_q p_k(x_q)`` -- exact for
         functions in the span when ``(X, weights)`` is a quadrature exact to the

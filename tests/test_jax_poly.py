@@ -106,6 +106,24 @@ class TestJaxPoly(unittest.TestCase):
                      - float(variance_of(jnp.array(ym)))) / (2 * eps)
         np.testing.assert_allclose(g, fd, rtol=1e-5, atol=1e-7)
 
+    def test_poly_ridge_fit(self):
+        # Ridge with tiny reg ~ exact fit; and variance differentiable w.r.t. reg.
+        rec = self._uniform_2d(4)
+        idx = eqj.total_order_indices(2, 2)
+        X, _ = eqj.tensor_quadrature(rec)
+        f = lambda Z: 1.0 + 2.0 * Z[:, 0] + 3.0 * Z[:, 0] * Z[:, 1]
+        poly = eqj.Poly(rec, idx)
+        poly.fit_ridge(X, f(X), 1e-12)
+        self.assertAlmostEqual(float(poly.mean()), 1.0, places=6)
+        self.assertAlmostEqual(float(poly.variance()), 7.0 / 3.0, places=6)
+
+        def var_of(reg):
+            p = eqj.Poly(rec, idx)
+            p.fit_ridge(X, f(X), reg)
+            return p.variance()
+
+        self.assertTrue(np.isfinite(float(jax.grad(var_of)(1e-3))))
+
     def test_poly_surrogate_differentiable(self):
         # d/dx of the fitted surrogate matches the analytic gradient of f:
         # df/dx1 = 2 + 3 x2 ; df/dx2 = 3 x1.
