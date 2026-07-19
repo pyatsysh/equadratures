@@ -114,6 +114,39 @@ class TestJaxQuadrature(unittest.TestCase):
         fd = (float(p_top(x0 + eps)) - float(p_top(x0 - eps))) / (2 * eps)
         self.assertAlmostEqual(g, fd, places=6)
 
+    def test_stieltjes_recovers_legendre(self):
+        # Feed a fine Gauss-Legendre discretisation of the uniform measure to the
+        # Stieltjes procedure; it must recover the analytic Legendre recurrence.
+        n = 6
+        M = n + 4
+        a_ref, b_ref, mu0_ref = eqj.legendre_recurrence(n)
+        aM, bM, mu0M = eqj.legendre_recurrence(M)
+        nodes, weights = eqj.gauss_quadrature(aM, bM, mu0M)      # exact uniform rule
+        alpha, beta, mu0 = eqj.stieltjes_recurrence(nodes, weights, n)
+        np.testing.assert_allclose(np.array(alpha), np.array(a_ref), atol=1e-10)
+        np.testing.assert_allclose(np.array(beta), np.array(b_ref), atol=1e-10)
+        self.assertAlmostEqual(float(mu0), float(mu0_ref), places=12)
+
+    def test_stieltjes_differentiable(self):
+        # Coefficients differentiable w.r.t. the measure weights (autodiff vs FD).
+        n = 4
+        aM, bM, mu0M = eqj.legendre_recurrence(n + 3)
+        nodes, weights = eqj.gauss_quadrature(aM, bM, mu0M)
+
+        def beta1(w):
+            _, beta, _ = eqj.stieltjes_recurrence(nodes, w, n)
+            return beta[1]
+
+        g = np.array(jax.grad(beta1)(weights))
+        eps = 1e-6
+        w = np.array(weights)
+        fd = np.zeros_like(w)
+        for i in range(len(w)):
+            wp = w.copy(); wp[i] += eps
+            wm = w.copy(); wm[i] -= eps
+            fd[i] = (float(beta1(jnp.array(wp))) - float(beta1(jnp.array(wm)))) / (2 * eps)
+        np.testing.assert_allclose(g, fd, rtol=1e-4, atol=1e-7)
+
     def test_jit_and_vmap(self):
         n = 5
         alpha, beta, mu0 = eqj.legendre_recurrence(n)

@@ -29,6 +29,19 @@ def legendre_recurrence(n):
     return alpha, beta, mu0
 
 
+def uniform_recurrence(n):
+    """Orthonormal recurrence for the *uniform probability* measure on [-1, 1]
+    (density 1/2, ``mu0 = 1``).
+
+    Same ``alpha``/``beta`` as :func:`legendre_recurrence` (the recurrence
+    coefficients are independent of the measure's normalisation); only ``mu0``
+    differs. Use this in the ``Poly`` layer so that ``p_0 = 1`` and the expansion
+    coefficients give ``mean = c_0``, ``variance = sum_{k>0} c_k^2``.
+    """
+    alpha, beta, _ = legendre_recurrence(n)
+    return alpha, beta, 1.0
+
+
 def hermite_recurrence(n):
     """Orthonormal (probabilists') Hermite recurrence for the standard-normal
     weight ``w(x) = exp(-x^2 / 2) / sqrt(2 pi)`` on the real line.
@@ -41,3 +54,55 @@ def hermite_recurrence(n):
     beta = jnp.sqrt(k)
     mu0 = 1.0
     return alpha, beta, mu0
+
+
+def stieltjes_recurrence(nodes, weights, n):
+    """Recurrence coefficients of a *discretised* measure via the Stieltjes
+    procedure (JAX port of ``distributions.recurrence_utils`` — differentiable).
+
+    Given a measure represented by ``(nodes, weights)`` (e.g. a fine grid
+    weighted by a density), returns the first ``n`` orthonormal-polynomial
+    recurrence coefficients. This is what lets an *arbitrary* distribution feed
+    the differentiable pipeline: the coefficients are differentiable w.r.t. the
+    nodes and weights, hence w.r.t. any distribution parameters behind them.
+
+    Parameters
+    ----------
+    nodes : array_like, shape (m,)
+        Support points of the discretised measure.
+    weights : array_like, shape (m,)
+        Non-negative masses at ``nodes``. ``mu0`` is their sum.
+    n : int
+        Number of recurrence coefficients (static).
+
+    Returns
+    -------
+    alpha : jax.numpy.ndarray, shape (n,)
+    beta : jax.numpy.ndarray, shape (n-1,)
+    mu0 : jax.numpy.ndarray, scalar
+
+    Notes
+    -----
+    Accurate to order ``n`` only if the discretisation integrates polynomials up
+    to degree ``2n-1`` well enough (e.g. an ``M>=n`` point Gauss rule makes the
+    first ``n`` coefficients exact).
+    """
+    x = jnp.asarray(nodes)
+    w = jnp.asarray(weights)
+    mu0 = jnp.sum(w)
+
+    alpha = [jnp.sum(w * x) / mu0]        # alpha_0 = weighted mean
+    b = [mu0]                             # b_0 = mu0 (0th moment)
+    p_prev = jnp.zeros_like(x)            # p_{-1}
+    p_cur = jnp.ones_like(x)             # p_0 (monic)
+    s = mu0
+    for k in range(1, n):
+        p_next = (x - alpha[k - 1]) * p_cur - b[k - 1] * p_prev
+        s1 = jnp.sum(w * p_next ** 2)
+        alpha.append(jnp.sum(w * x * p_next ** 2) / s1)
+        b.append(s1 / s)
+        s = s1
+        p_prev, p_cur = p_cur, p_next
+
+    b = jnp.stack(b)
+    return jnp.stack(alpha), jnp.sqrt(b[1:]), mu0
