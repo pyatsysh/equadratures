@@ -31,6 +31,7 @@ from equadratures.jax.basis import (
 )
 from equadratures.jax.poly import Poly, tensor_quadrature
 from equadratures.jax.parameter import Parameter
+from equadratures.jax.kernel import PolynomialKernel, gp_nlml, gp_predict
 
 __all__ = [
     "jacobi_matrix",
@@ -46,4 +47,7 @@ __all__ = [
     "Poly",
     "tensor_quadrature",
     "Parameter",
+    "PolynomialKernel",
+    "gp_nlml",
+    "gp_predict",
 ]

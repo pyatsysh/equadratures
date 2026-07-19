@@ -34,6 +34,7 @@ setup(name='equadratures',
       ],
       extras_require={
           "jax": ['jax>=0.4'],
+          "jax-learn": ['jax>=0.4', 'optax>=0.2'],
           "cvxpy":  ['cvxpy>=1.1'],
           "networkx":  ['networkx==2.6.3'],
           "torch" : ['torch>=1.7.0'],
