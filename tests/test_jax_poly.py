@@ -68,6 +68,44 @@ class TestJaxPoly(unittest.TestCase):
         self.assertAlmostEqual(float(poly.mean()), 1.0, places=8)
         self.assertAlmostEqual(float(poly.variance()), 7.0 / 3.0, places=8)
 
+    def test_sobol_indices(self):
+        # f = 1 + 2 x1 + 3 x1 x2 : var = 7/3, main-effect(x1) = 4/3, interaction = 1.
+        # S1 = (4/3)/(7/3) = 4/7 ; S2 = 0 ; T1 = 1 ; T2 = (1)/(7/3) = 3/7.
+        rec = self._uniform_2d(4)
+        idx = eqj.total_order_indices(2, 2)
+        X, W = eqj.tensor_quadrature(rec)
+        f = lambda Z: 1.0 + 2.0 * Z[:, 0] + 3.0 * Z[:, 0] * Z[:, 1]
+        poly = eqj.Poly(rec, idx)
+        poly.fit_projection(X, f(X), W)
+        S = np.array(poly.sobol_indices())
+        T = np.array(poly.total_sobol_indices())
+        np.testing.assert_allclose(S, [4.0 / 7.0, 0.0], atol=1e-9)
+        np.testing.assert_allclose(T, [1.0, 3.0 / 7.0], atol=1e-9)
+
+    def test_variance_differentiable_wrt_data(self):
+        # Differentiable UQ output: d(variance)/d(training y) vs finite differences.
+        rec = self._uniform_2d(4)
+        idx = eqj.total_order_indices(2, 2)
+        X, W = eqj.tensor_quadrature(rec)
+        f = lambda Z: 1.0 + 2.0 * Z[:, 0] + 3.0 * Z[:, 0] * Z[:, 1]
+        y0 = f(X)
+
+        def variance_of(y):
+            poly = eqj.Poly(rec, idx)
+            poly.fit_projection(X, y, W)
+            return poly.variance()
+
+        g = np.array(jax.grad(variance_of)(y0))
+        eps = 1e-6
+        y = np.array(y0)
+        fd = np.zeros_like(y)
+        for i in range(len(y)):
+            yp = y.copy(); yp[i] += eps
+            ym = y.copy(); ym[i] -= eps
+            fd[i] = (float(variance_of(jnp.array(yp)))
+                     - float(variance_of(jnp.array(ym)))) / (2 * eps)
+        np.testing.assert_allclose(g, fd, rtol=1e-5, atol=1e-7)
+
     def test_poly_surrogate_differentiable(self):
         # d/dx of the fitted surrogate matches the analytic gradient of f:
         # df/dx1 = 2 + 3 x2 ; df/dx2 = 3 x1.

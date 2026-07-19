@@ -93,3 +93,30 @@ class Poly:
     def variance(self):
         """Variance of the expansion (``sum_{k>0} c_k^2``; Parseval)."""
         return jnp.sum(self.coefficients[1:] ** 2)
+
+    def sobol_indices(self):
+        """First-order Sobol' indices, one per dimension.
+
+        ``S_i`` is the fraction of the variance explained by basis terms that
+        depend on dimension ``i`` *alone*. Differentiable w.r.t. the coefficients
+        (hence w.r.t. the training data) -- a differentiable UQ output.
+        """
+        c2 = self.coefficients ** 2
+        var = jnp.sum(c2[1:])
+        total_deg = self.indices.sum(axis=1)
+        S = []
+        for i in range(self.indices.shape[1]):
+            only_i = jnp.asarray((self.indices[:, i] > 0) & (total_deg == self.indices[:, i]))
+            S.append(jnp.sum(jnp.where(only_i, c2, 0.0)) / var)
+        return jnp.stack(S)
+
+    def total_sobol_indices(self):
+        """Total-effect Sobol' indices: variance fraction from *all* terms that
+        involve dimension ``i`` (main effect plus every interaction)."""
+        c2 = self.coefficients ** 2
+        var = jnp.sum(c2[1:])
+        T = []
+        for i in range(self.indices.shape[1]):
+            has_i = jnp.asarray(self.indices[:, i] > 0)
+            T.append(jnp.sum(jnp.where(has_i, c2, 0.0)) / var)
+        return jnp.stack(T)
