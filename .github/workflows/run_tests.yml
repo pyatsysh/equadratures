@@ -50,3 +50,39 @@ jobs:
           coverage run --source=tests -m nose2
           coverage report -m
           coveralls --service=github
+
+  # The equadratures.jax namespace is an optional extra with a higher Python
+  # floor than the classic package (JAX itself requires >= 3.12), so it gets its
+  # own job rather than widening the matrix above. On the classic job the JAX
+  # tests skip themselves automatically, since JAX is not installed there.
+  #
+  # Selector: every JAX acceptance-gate test lives in tests/test_jax_*.py. That
+  # filename convention is the marker -- it works identically under unittest,
+  # nose2 and pytest, so no test-runner dependency is added to the package.
+  jax:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install .[jax-learn,jax-bayes]
+      - name: Report versions
+        run: |
+          python -c "import jax, numpy, scipy; print('jax', jax.__version__); print('numpy', numpy.__version__); print('scipy', scipy.__version__)"
+      - name: Acceptance gate
+        run: |
+          python -m unittest discover -s tests -p "test_jax_*.py" -v
+      - name: Benchmarks
+        run: |
+          python benchmarks/jax_benchmarks.py --quick
