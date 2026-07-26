@@ -16,7 +16,12 @@ and JAX defaults to float32.
 from jax import config as _config
 _config.update("jax_enable_x64", True)
 
-from equadratures.jax.quadrature import jacobi_matrix, gauss_quadrature
+from equadratures.jax.quadrature import (
+    jacobi_matrix,
+    gauss_quadrature,
+    radau_quadrature,
+    lobatto_quadrature,
+)
 from equadratures.jax.recurrence import (
     legendre_recurrence,
     uniform_recurrence,
@@ -44,6 +49,8 @@ from equadratures.jax.solver import (
 __all__ = [
     "jacobi_matrix",
     "gauss_quadrature",
+    "radau_quadrature",
+    "lobatto_quadrature",
     "legendre_recurrence",
     "uniform_recurrence",
     "hermite_recurrence",
