@@ -42,7 +42,12 @@ from equadratures.jax.parameter import (
     beta_density,
     truncated_gaussian_density,
 )
-from equadratures.jax.kernel import PolynomialKernel, gp_nlml, gp_predict
+from equadratures.jax.kernel import (
+    PolynomialKernel,
+    gp_nlml,
+    gp_predict,
+    gp_predict_with_variance,
+)
 from equadratures.jax.solver import (
     elastic_net,
     lasso,
@@ -75,6 +80,7 @@ __all__ = [
     "PolynomialKernel",
     "gp_nlml",
     "gp_predict",
+    "gp_predict_with_variance",
     "elastic_net",
     "lasso",
     "lasso_debiased",

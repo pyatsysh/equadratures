@@ -71,3 +71,58 @@ def gp_predict(kernel, Xtrain, ytrain, Xtest, log_theta, log_noise):
     Ks = kernel.gram(Xtest, Xtrain, log_theta)
     alpha = jnp.linalg.solve(K, ytrain)
     return Ks @ alpha
+
+
+def gp_predict_with_variance(kernel, Xtrain, ytrain, Xtest, log_theta,
+                             log_noise, include_noise=False):
+    """Posterior mean *and* variance at ``Xtest`` (both differentiable).
+
+    A Gaussian process whose predictions carry no uncertainty is only doing
+    kernel ridge regression; the variance is the point. For a Mercer kernel
+    built from a finite feature map the posterior variance is the usual
+
+    ``var(x*) = k(x*, x*) - k(x*, X) [K + sigma^2 I]^-1 k(X, x*)``
+
+    evaluated row by row, so it costs one solve shared across all test points.
+
+    Parameters
+    ----------
+    include_noise : bool
+        If ``True`` return the *predictive* variance for a new noisy
+        observation (adds ``sigma^2``); if ``False`` return the variance of the
+        latent function, which is what you want for error bars on the model
+        itself.
+
+    Returns
+    -------
+    mean : jax.numpy.ndarray, shape (n_test,)
+    var : jax.numpy.ndarray, shape (n_test,)
+        Clipped at zero: the algebra is exact but round-off can push a
+        near-zero variance very slightly negative.
+
+    Notes
+    -----
+    With a rank-``n_features`` kernel the variance falls to zero once the
+    training data pin down every feature -- correct behaviour for a
+    finite-dimensional model, and worth knowing before reading the error bars:
+    they describe uncertainty *within the polynomial span*, not model-form error
+    outside it.
+    """
+    m = Xtrain.shape[0]
+    noise = jnp.exp(log_noise)
+    K = kernel.gram(Xtrain, Xtrain, log_theta) + noise * jnp.eye(m)
+    Ks = kernel.gram(Xtest, Xtrain, log_theta)              # (n_test, m)
+
+    L = jnp.linalg.cholesky(K)
+    alpha = jsl.solve_triangular(L.T, jsl.solve_triangular(L, ytrain, lower=True),
+                                 lower=False)
+    mean = Ks @ alpha
+
+    v = jsl.solve_triangular(L, Ks.T, lower=True)           # (m, n_test)
+    Phi = kernel.features(Xtest)
+    w = jnp.exp(2.0 * log_theta)
+    k_diag = jnp.sum(Phi * w * Phi, axis=1)                 # k(x*, x*) per point
+    var = k_diag - jnp.sum(v ** 2, axis=0)
+    if include_noise:
+        var = var + noise
+    return mean, jnp.maximum(var, 0.0)
