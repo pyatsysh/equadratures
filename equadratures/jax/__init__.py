@@ -35,7 +35,13 @@ from equadratures.jax.basis import (
     design_matrix,
 )
 from equadratures.jax.poly import Poly, tensor_quadrature
-from equadratures.jax.parameter import Parameter
+from equadratures.jax.parameter import (
+    Parameter,
+    DensityParameter,
+    density_recurrence,
+    beta_density,
+    truncated_gaussian_density,
+)
 from equadratures.jax.kernel import PolynomialKernel, gp_nlml, gp_predict
 from equadratures.jax.solver import (
     elastic_net,
@@ -62,6 +68,10 @@ __all__ = [
     "Poly",
     "tensor_quadrature",
     "Parameter",
+    "DensityParameter",
+    "density_recurrence",
+    "beta_density",
+    "truncated_gaussian_density",
     "PolynomialKernel",
     "gp_nlml",
     "gp_predict",

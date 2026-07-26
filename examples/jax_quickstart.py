@@ -42,6 +42,23 @@ def demo_prescribed_nodes():
           % [round(float(v), 4) for v in nodes])
 
 
+def demo_distribution_gradient():
+    # Differentiate a UQ output w.r.t. the *input distribution's* shape.
+    f = lambda Z: jnp.exp(Z[:, 0]) + Z[:, 0] ** 3
+
+    def variance_given(a):
+        p = eqj.DensityParameter(eqj.beta_density(a, 3.0), 0.0, 1.0, n_grid=250)
+        rec = [p.recurrence(8)]
+        X, W = eqj.tensor_quadrature(rec)
+        poly = eqj.Poly(rec, eqj.total_order_indices(1, 5))
+        poly.fit_projection(X, f(X), W)
+        return poly.variance()
+
+    print("[dist] Var[f(X)] with X~Beta(2,3) = %.6f" % float(variance_given(2.0)))
+    print("[dist] d(Var)/d(Beta shape a)    = %.6f  <- the classic namespace "
+          "cannot produce this" % float(jax.grad(variance_given)(2.0)))
+
+
 def demo_sparse():
     # 20 samples, 28 basis terms: least squares is under-determined, l1 is not.
     import numpy as np
@@ -103,5 +120,6 @@ if __name__ == "__main__":
     demo_quadrature()
     demo_prescribed_nodes()
     demo_uq()
+    demo_distribution_gradient()
     demo_sparse()
     demo_learnable_kernel()

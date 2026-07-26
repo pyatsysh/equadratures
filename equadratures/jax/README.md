@@ -31,12 +31,28 @@ nodes, weights = eqj.gauss_quadrature(alpha, beta, mu0)
 approx = jnp.sum(weights * nodes**4)            # ~ integral of x^4 = 2/5
 ```
 
-Arbitrary distributions? Discretise the measure and use the Stieltjes recurrence
-(differentiable w.r.t. the nodes/weights, hence w.r.t. distribution parameters):
+Arbitrary distributions? Hand it a **density** and the orthonormal family is
+built numerically — and differentiably, including with respect to the
+distribution's own parameters:
 
 ```python
-alpha, beta, mu0 = eqj.stieltjes_recurrence(nodes, weights, n=6)
+p = eqj.DensityParameter(eqj.beta_density(a=2.0, b=3.0), lower=0.0, upper=1.0)
+alpha, beta, mu0 = p.recurrence(6)      # alpha[0] = E[X], beta[0]**2 = Var[X]
 ```
+
+So you can ask *how sensitive is my output to how I modelled the input?* — a
+derivative the classic namespace cannot produce at all:
+
+```python
+jax.grad(lambda a: variance_of_surrogate_under(eqj.beta_density(a, 3.0)))(2.0)
+```
+
+The interval is discretised on **Gauss–Legendre** nodes, not an equispaced grid.
+Besides being far more accurate, the nodes are strictly *interior*, so densities
+that blow up at an endpoint still work — `Beta(0.5, 0.5)` returns `inf` from
+classic's equispaced pdf grid but is handled here. `stieltjes_recurrence(nodes,
+weights, n)` remains available if you want to supply a discretised measure
+directly.
 
 Need a node *pinned* somewhere — a boundary condition, a design constraint?
 Radau fixes one, Lobatto fixes both ends, at a cost of one and two degrees of
@@ -200,7 +216,8 @@ order (for total-order bases the two coincide).
 `legendre_recurrence`, `uniform_recurrence`, `hermite_recurrence`,
 `stieltjes_recurrence` · `orthonormal_polynomials` · `total_order_indices`,
 `tensor_grid_indices`, `design_matrix` · `Poly`, `tensor_quadrature` ·
-`Parameter` · `PolynomialKernel`, `gp_nlml`, `gp_predict` · `lasso`,
+`Parameter`, `DensityParameter`, `density_recurrence`, `beta_density`,
+`truncated_gaussian_density` · `PolynomialKernel`, `gp_nlml`, `gp_predict` · `lasso`,
 `lasso_debiased`, `lasso_path`, `elastic_net`, `ridge`, `soft_threshold`.
 
 Optional, imported separately (needs `[jax-bayes]`):
