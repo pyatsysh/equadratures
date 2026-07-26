@@ -33,6 +33,41 @@ def demo_uq():
           % [round(float(g), 4) for g in dpred])
 
 
+def demo_prescribed_nodes():
+    alpha, beta, mu0 = eqj.legendre_recurrence(5)
+    nodes, _ = eqj.radau_quadrature(alpha, beta, mu0, -1.0)
+    print("[rules] 5-pt Radau  pins x=-1: %s" % [round(float(v), 4) for v in nodes])
+    nodes, _ = eqj.lobatto_quadrature(alpha, beta, mu0, -1.0, 1.0)
+    print("[rules] 5-pt Lobatto pins both ends: %s"
+          % [round(float(v), 4) for v in nodes])
+
+
+def demo_sparse():
+    # 20 samples, 28 basis terms: least squares is under-determined, l1 is not.
+    import numpy as np
+    rng = np.random.default_rng(7)
+    rec = [eqj.uniform_recurrence(8), eqj.uniform_recurrence(8)]
+    idx = eqj.total_order_indices(2, 6)
+    X = jnp.asarray(rng.uniform(-1, 1, size=(20, 2)))
+    f = lambda Z: 1.0 + 2.0 * Z[:, 0] + 3.0 * Z[:, 0] * Z[:, 1]
+
+    poly = eqj.Poly(rec, idx)
+    c = poly.fit_lasso(X, f(X), 1e-3, max_iter=8000)
+    Xt = jnp.asarray(rng.uniform(-1, 1, size=(15, 2)))
+    err = float(jnp.max(jnp.abs(poly.predict(Xt) - f(Xt))))
+    print("[sparse] %d of %d basis terms active; max test error %.2e"
+          % (int(jnp.count_nonzero(c)), idx.shape[0], err))
+
+    # the penalty is a differentiable input, so it can be trained
+    def val_loss(l1):
+        p = eqj.Poly(rec, idx)
+        p.fit_elastic_net(X, f(X), l1, 1e-6, max_iter=4000)
+        return jnp.mean((p.predict(Xt) - f(Xt)) ** 2)
+
+    print("[sparse] d(validation MSE)/d(penalty) = %.4e"
+          % float(jax.grad(val_loss)(1e-3)))
+
+
 def demo_learnable_kernel():
     try:
         import optax
@@ -66,5 +101,7 @@ def demo_learnable_kernel():
 
 if __name__ == "__main__":
     demo_quadrature()
+    demo_prescribed_nodes()
     demo_uq()
+    demo_sparse()
     demo_learnable_kernel()
