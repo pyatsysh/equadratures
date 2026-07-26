@@ -32,6 +32,14 @@ from equadratures.jax.basis import (
 from equadratures.jax.poly import Poly, tensor_quadrature
 from equadratures.jax.parameter import Parameter
 from equadratures.jax.kernel import PolynomialKernel, gp_nlml, gp_predict
+from equadratures.jax.solver import (
+    elastic_net,
+    lasso,
+    lasso_debiased,
+    lasso_path,
+    ridge,
+    soft_threshold,
+)
 
 __all__ = [
     "jacobi_matrix",
@@ -50,4 +58,10 @@ __all__ = [
     "PolynomialKernel",
     "gp_nlml",
     "gp_predict",
+    "elastic_net",
+    "lasso",
+    "lasso_debiased",
+    "lasso_path",
+    "ridge",
+    "soft_threshold",
 ]

@@ -17,6 +17,13 @@ import jax.numpy as jnp
 
 from equadratures.jax.basis import design_matrix
 from equadratures.jax.quadrature import gauss_quadrature
+from equadratures.jax.solver import (
+    DEFAULT_MAX_ITER,
+    elastic_net,
+    lasso,
+    lasso_debiased,
+    ridge,
+)
 
 
 def tensor_quadrature(recurrences):
@@ -82,9 +89,43 @@ class Poly:
         differentiable input (e.g. a learnable hyper-parameter).
         """
         A = self.get_design(X)
-        n = A.shape[1]
-        gram = A.T @ A + regularisation * jnp.eye(n)
-        self.coefficients = jnp.linalg.solve(gram, A.T @ jnp.asarray(y))
+        self.coefficients = ridge(A, jnp.asarray(y), regularisation)
+        return self.coefficients
+
+    def fit_lasso(self, X, y, regularisation, max_iter=DEFAULT_MAX_ITER):
+        """Sparse ``l1``-regularised fit -- the compressed-sensing route.
+
+        Recovers a sparse expansion from fewer samples than basis terms. Unlike
+        the classic ``compressed-sensing`` solver (an opaque ``cvxpy`` call),
+        this one is differentiable in the data, the design and the penalty, via
+        implicit differentiation of the optimality conditions. See
+        :mod:`equadratures.jax.solver`.
+        """
+        A = self.get_design(X)
+        self.coefficients = lasso(A, jnp.asarray(y), regularisation, max_iter)
+        return self.coefficients
+
+    def fit_lasso_debiased(self, X, y, regularisation, max_iter=DEFAULT_MAX_ITER):
+        """Sparse fit with the ``l1`` shrinkage bias removed.
+
+        Uses the ``l1`` solve to pick the active basis terms, then re-fits them
+        by ordinary least squares. This is usually what you want for a
+        compressed-sensing surrogate: the sparsity of the ``l1`` solution with
+        the accuracy of an unpenalised fit.
+        """
+        A = self.get_design(X)
+        self.coefficients = lasso_debiased(A, jnp.asarray(y), regularisation,
+                                           max_iter)
+        return self.coefficients
+
+    def fit_elastic_net(self, X, y, l1, l2, max_iter=DEFAULT_MAX_ITER):
+        """Elastic-net fit: ``l1`` for sparsity, ``l2`` for correlated columns.
+
+        Differentiable in both penalties, so they can be *learned* (e.g. tuned
+        by gradient descent on a validation loss) rather than grid-searched.
+        """
+        A = self.get_design(X)
+        self.coefficients = elastic_net(A, jnp.asarray(y), l1, l2, max_iter)
         return self.coefficients
 
     def fit_projection(self, X, y, weights):
