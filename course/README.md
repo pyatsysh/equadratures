@@ -1,6 +1,6 @@
 # Differentiable Polynomial Approximation — a short course
 
-A six-lesson, hands-on introduction to approximating expensive models with
+A seven-lesson, hands-on introduction to approximating expensive models with
 orthogonal polynomials, quantifying the uncertainty in their predictions, and —
 the part that is new — **differentiating through the whole thing**.
 
@@ -18,7 +18,9 @@ each lesson introduces what it needs, in the order it needs it.
 
 If you have never met orthogonal polynomials, start at lesson 1 and read
 straight through. If you already do polynomial chaos and came for the
-differentiability, skim lessons 1–4 and start properly at lesson 5.
+differentiability, skim lessons 1–4 and start properly at lesson 5. If you came
+from machine learning and want the neural-operator connection, lesson 7 is
+self-contained enough to read after lesson 2.
 
 ## What you will be able to do afterwards
 
@@ -33,6 +35,8 @@ differentiability, skim lessons 1–4 and start properly at lesson 5.
    the assumed input distribution** — and know why that last one is useful.
 6. Train a polynomial kernel, use it for Gaussian-process regression, and solve
    a Bayesian inverse problem with gradient-based MCMC.
+7. Build a surrogate for an *operator* rather than a function, and say which of
+   its properties are exact and which are approximations you are choosing.
 
 ## Lessons
 
@@ -44,6 +48,7 @@ differentiability, skim lessons 1–4 and start properly at lesson 5.
 | 4 | `04_uncertainty.py` | Means, variances and Sobol' indices — reading a surrogate as an interpretable model. |
 | 5 | `05_gradients.py` | Differentiating through everything: data, inputs, and the input distribution itself. |
 | 6 | `06_kernels_and_inference.py` | Learnable polynomial kernels, GP regression, and Bayesian inverse problems with NUTS. |
+| 7 | `07_operators.py` | Learning maps between *functions*. Neural operators on a polynomial basis, and what stays exact. |
 
 Each lesson ends with **exercises**, and each exercise has a worked solution at
 the bottom of the same file, so the course works unsupervised.
