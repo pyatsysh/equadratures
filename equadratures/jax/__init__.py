@@ -56,6 +56,13 @@ from equadratures.jax.solver import (
     ridge,
     soft_threshold,
 )
+from equadratures.jax.operator import (
+    SpectralOperatorLayer,
+    NeuralOperator,
+    effective_spectral_tensor,
+    linear_operator_tensor,
+    derivative_operator_tensor,
+)
 
 __all__ = [
     "jacobi_matrix",
@@ -87,4 +94,9 @@ __all__ = [
     "lasso_path",
     "ridge",
     "soft_threshold",
+    "SpectralOperatorLayer",
+    "NeuralOperator",
+    "effective_spectral_tensor",
+    "linear_operator_tensor",
+    "derivative_operator_tensor",
 ]

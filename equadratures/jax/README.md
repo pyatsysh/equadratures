@@ -150,7 +150,62 @@ for _ in range(300):                     # train the kernel spectrum + noise
 pred = eqj.gp_predict(kernel, Xtr, ytr, Xte, params["log_theta"], params["log_noise"])
 ```
 
-## 6. Bayesian inference — NUTS straight through the surrogate
+## 6. Neural operators on a polynomial basis
+
+A neural operator learns a map between *functions*. Every architecture is a stack
+of `v(x) = σ(W u(x) + (K u)(x) + b)` and they differ only in how the integral
+operator `K` is represented: the Fourier neural operator makes `κ` diagonal in a
+Fourier basis and applies it with an FFT. Here `κ` sits in the orthonormal
+polynomial basis and the integral is a Gauss quadrature:
+
+`κ(x, y) = Σ_jk R_jk φ_j(x) φ_k(y)`,  `(K u)(x) = Σ_jk R_jk φ_j(x) c_k`,
+`c_k = Σ_i w_i φ_k(x_i) u(x_i)`
+
+```python
+layer = eqj.SpectralOperatorLayer(rec, indices, channels_in=1, channels_out=1)
+params = layer.init_params(jax.random.PRNGKey(0))
+v = layer.apply(u, params)                  # u sampled at layer.X
+```
+
+Three properties follow from the representation rather than from training, and
+they are what makes the polynomial basis worth using here:
+
+- **Interpretable.** `R` is the operator's matrix in a basis of known polynomial
+  modes — which input mode feeds which output mode, and how strongly.
+- **Exact on the span.** Any linear operator mapping the span into itself has an
+  exact `R = ⟨φ_j, A φ_k⟩`. `derivative_operator_tensor` builds it for `d/dx`,
+  and the layer then reproduces differentiation to ~1e-15 relative rather than
+  approximating it — analytically, with no optimiser involved. *Learning* the
+  same operator from data is a separate and weaker claim: gradient descent
+  recovers it to ~1e-5 (anneal the learning rate; Adam is unstable once the
+  gradient reaches round-off).
+- **Discretisation-invariant, exactly.** The parameters live on modes, not on a
+  grid, so evaluating on a finer quadrature returns the *same function* to
+  round-off — not merely a similar one.
+
+`mode="diagonal"` is the direct FNO analogue and, single-channel, is exactly the
+Mercer kernel of section 5 with `R_k = θ_k²`. `mode="dense"` couples modes too,
+which it must to represent a non-symmetric operator such as differentiation.
+
+```python
+R = eqj.derivative_operator_tensor(layer)   # exact d/dx, no training
+stack = eqj.NeuralOperator([layer1, layer2])
+```
+
+One caveat, stated rather than buried: between layers the output is re-projected
+onto the span, and `σ(v)` generally is not in it. A **linear** stack is exact; a
+nonlinear one carries a truncation error per layer, controlled by the mode count.
+The FNO truncates the same way.
+
+When comparing a *learned* operator against a known one, use
+`effective_spectral_tensor(layer, params)` and not the raw `params["spectral"]`.
+The pointwise term acts as a multiple of the identity in mode space, so the two
+blocks are not separately identifiable: measured in the test suite, the raw
+tensor is off by ~1e-1 where the operator it defines is right.
+
+Worked script: `examples/jax_neural_operator.py`.
+
+## 7. Bayesian inference — NUTS straight through the surrogate
 
 Gradient-based samplers need `d(log density)/d(parameters)` through the forward
 model. That derivative is exactly what the classic namespace cannot give, so
@@ -217,8 +272,11 @@ order (for total-order bases the two coincide).
 `stieltjes_recurrence` · `orthonormal_polynomials` · `total_order_indices`,
 `tensor_grid_indices`, `design_matrix` · `Poly`, `tensor_quadrature` ·
 `Parameter`, `DensityParameter`, `density_recurrence`, `beta_density`,
-`truncated_gaussian_density` · `PolynomialKernel`, `gp_nlml`, `gp_predict` · `lasso`,
-`lasso_debiased`, `lasso_path`, `elastic_net`, `ridge`, `soft_threshold`.
+`truncated_gaussian_density` · `PolynomialKernel`, `gp_nlml`, `gp_predict`,
+`gp_predict_with_variance` · `lasso`, `lasso_debiased`, `lasso_path`,
+`elastic_net`, `ridge`, `soft_threshold` · `SpectralOperatorLayer`,
+`NeuralOperator`, `effective_spectral_tensor`, `linear_operator_tensor`,
+`derivative_operator_tensor`.
 
 Optional, imported separately (needs `[jax-bayes]`):
 `equadratures.jax.inverse` — `surrogate_input_model`, `sparse_coefficient_model`,

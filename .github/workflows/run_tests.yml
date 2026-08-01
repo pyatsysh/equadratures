@@ -87,6 +87,18 @@ jobs:
         run: |
           python benchmarks/jax_benchmarks.py --quick
 
+      # The README points readers at these as runnable scripts, so they are run.
+      # Same reasoning as the course job below: a documented example that has
+      # drifted out of step with the library is worse than no example, because
+      # the reader trusts it. About a minute for all three.
+      - name: Examples
+        run: |
+          for example in examples/*.py; do
+            echo "::group::$example"
+            python "$example" || exit 1
+            echo "::endgroup::"
+          done
+
   # The course (grant deliverable D5) claims in its README that "every lesson in
   # this course is executed as part of development", so the lessons are run here
   # rather than trusted. They are ordinary Python scripts by design, which is
