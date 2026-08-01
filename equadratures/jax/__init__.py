@@ -56,6 +56,14 @@ from equadratures.jax.solver import (
     ridge,
     soft_threshold,
 )
+from equadratures.jax import parallel
+from equadratures.jax.parallel import (
+    device_count,
+    make_mesh,
+    shard_batched,
+    sharded_apply,
+    sharded_predict,
+)
 from equadratures.jax.subspace import (
     PolynomialRidge,
     active_subspace,
@@ -101,6 +109,12 @@ __all__ = [
     "lasso_path",
     "ridge",
     "soft_threshold",
+    "parallel",
+    "device_count",
+    "make_mesh",
+    "shard_batched",
+    "sharded_apply",
+    "sharded_predict",
     "PolynomialRidge",
     "active_subspace",
     "gradient_covariance",

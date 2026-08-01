@@ -83,6 +83,18 @@ jobs:
       - name: Acceptance gate
         run: |
           python -m unittest discover -s tests -p "test_jax_*.py" -v
+      # The acceptance gate above runs on whatever devices the runner has, which
+      # is one CPU. The sharding tests would then skip their multi-device
+      # assertions and pass vacuously, so they are run again here with JAX told
+      # to expose eight devices. This checks that a sharded computation returns
+      # exactly what a single device returns; it says nothing about speed, which
+      # would need real accelerators.
+      - name: Sharding on simulated devices
+        env:
+          XLA_FLAGS: --xla_force_host_platform_device_count=8
+        run: |
+          python -m unittest discover -s tests -p "test_jax_parallel.py" -v
+
       - name: Benchmarks
         run: |
           python benchmarks/jax_benchmarks.py --quick

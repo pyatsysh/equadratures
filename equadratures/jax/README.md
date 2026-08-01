@@ -308,6 +308,22 @@ overhead dominates and you should not bother.
 *(CPU-only box; the accelerator half of the story is untested here — see the
 caveat printed by the benchmark script.)*
 
+### Several devices
+
+`equadratures.jax.parallel` splits a batch across devices — `sharded_predict`
+for surrogate evaluation, `sharded_apply` for operator batches, `shard_batched`
+for anything else. Batch lengths need not divide the device count; padding and
+trimming are handled.
+
+Two claims worth keeping apart. **Correctness is verified**: JAX will expose
+several devices on a plain CPU, so "sharding across n devices returns exactly
+what one device returns" is tested on eight simulated devices, in CI, including
+the indivisible and fewer-items-than-devices cases. **Speed-up is not measured**,
+because this machine has no accelerator, and a timing number from eight
+simulated CPU devices would be worthless. With one device the module is
+`jit(vmap(...))` and nothing else, so the same code runs unchanged on a laptop
+and on a multi-GPU host.
+
 ## Design & validation philosophy
 
 Every primitive is validated by a **sum-rule / exactness** check *and* an
