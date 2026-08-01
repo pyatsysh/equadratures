@@ -205,7 +205,48 @@ tensor is off by ~1e-1 where the operator it defines is right.
 
 Worked script: `examples/jax_neural_operator.py`.
 
-## 7. Bayesian inference — NUTS straight through the surrogate
+## 7. Latent-variable models — learning the subspace that matters
+
+Many models with dozens of inputs vary along only a handful of directions:
+`f(x) ≈ g(Uᵀx)` with `U` a `d × r` orthonormal matrix whose columns are learned
+linear combinations of the inputs. Two routes, answering different questions.
+
+**With gradients** — `C = E[∇f ∇fᵀ]`, whose small eigenvalues mark directions
+the model ignores. Classically the gradients are the obstacle; here they are one
+`jax.grad` of the surrogate.
+
+```python
+eigenvalues, U = eqj.active_subspace(poly.predict, X, dimension=1)
+```
+
+**Without them** — `PolynomialRidge` learns `U` and the polynomial together from
+function values alone, by **variable projection**: for any `U` the best
+coefficients are a linear least squares, so they are eliminated in closed form
+and the loss depends on `U` alone. Differentiating it means differentiating
+*through* a least-squares solve.
+
+```python
+model = eqj.PolynomialRidge(dimensions=8, subspace_dimension=1, order=3)
+model.fit(X, y)
+model.predict(X_new)
+```
+
+The classic namespace does this with a hand-derived Gauss–Newton Jacobian, an
+Armijo line search and two hand-tuned constants — its own source comment asks
+*"How do we know these are the best values of gamma and beta?"*. Autodiff
+removes both the Jacobian and the question. `U` is constrained by construction
+(a sign-fixed QR), so no manifold optimiser is needed either.
+
+On a genuine ridge function both routes recover the true subspace to ~1e-15, and
+the active subspace agrees with the classic implementation's eigenvalues to
+eight decimal places.
+
+**Compare subspaces, never `U` itself.** `U` and `UQ` for orthogonal `Q` are the
+same subspace and the same model, so an elementwise comparison measures the
+rotation an optimiser happened to land on. Use `subspace_distance`. (Same trap as
+the spectral/pointwise split in section 6, in different clothes.)
+
+## 8. Bayesian inference — NUTS straight through the surrogate
 
 Gradient-based samplers need `d(log density)/d(parameters)` through the forward
 model. That derivative is exactly what the classic namespace cannot give, so
@@ -294,7 +335,8 @@ order (for total-order bases the two coincide).
 `gp_predict_with_variance` · `lasso`, `lasso_debiased`, `lasso_path`,
 `elastic_net`, `ridge`, `soft_threshold` · `SpectralOperatorLayer`,
 `NeuralOperator`, `effective_spectral_tensor`, `linear_operator_tensor`,
-`derivative_operator_tensor`.
+`derivative_operator_tensor` · `PolynomialRidge`, `active_subspace`,
+`gradient_covariance`, `orthonormalise`, `subspace_distance`.
 
 Optional, imported separately (needs `[jax-bayes]`):
 `equadratures.jax.inverse` — `surrogate_input_model`, `sparse_coefficient_model`,

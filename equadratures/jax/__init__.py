@@ -56,6 +56,13 @@ from equadratures.jax.solver import (
     ridge,
     soft_threshold,
 )
+from equadratures.jax.subspace import (
+    PolynomialRidge,
+    active_subspace,
+    gradient_covariance,
+    orthonormalise,
+    subspace_distance,
+)
 from equadratures.jax.operator import (
     SpectralOperatorLayer,
     NeuralOperator,
@@ -94,6 +101,11 @@ __all__ = [
     "lasso_path",
     "ridge",
     "soft_threshold",
+    "PolynomialRidge",
+    "active_subspace",
+    "gradient_covariance",
+    "orthonormalise",
+    "subspace_distance",
     "SpectralOperatorLayer",
     "NeuralOperator",
     "effective_spectral_tensor",
