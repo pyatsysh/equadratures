@@ -194,6 +194,28 @@ class TestSpectralOperatorLayer(unittest.TestCase):
         want = kap @ (layer.W * u[:, 0])
         np.testing.assert_allclose(np.array(got), np.array(want), atol=1e-11)
 
+    def test_effective_tensor_reproduces_the_layer_in_both_modes(self):
+        """The combined tensor must actually describe what the layer computes.
+
+        ``effective_spectral_tensor`` is what every comparison against a known
+        operator goes through, so if it were wrong the identifiability gates
+        would be checking a fiction. Rebuilding the layer's output from it is
+        the direct check, and diagonal mode needs it most: there the combination
+        involves promoting a mode-diagonal tensor to a dense one.
+        """
+        for mode in ("diagonal", "dense"):
+            layer = _layer(mode=mode)
+            params = layer.init_params(jax.random.PRNGKey(20))
+            u, _ = _random_span_function(layer, seed=21)
+
+            from_layer = layer.apply(u, params) - params["bias"]
+            effective = eqj.effective_spectral_tensor(layer, params)
+            rebuilt = layer.design(None) @ jnp.einsum(
+                "jkoi,ki->jo", effective, layer.project(u))
+            np.testing.assert_allclose(np.array(from_layer), np.array(rebuilt),
+                                       atol=1e-12,
+                                       err_msg="mode=%s" % mode)
+
     def test_bad_mode_is_rejected(self):
         with self.assertRaises(ValueError):
             _layer(mode="fourier")
