@@ -284,6 +284,125 @@ def bench_versus_classic(report, quick):
 
 
 # --------------------------------------------------------------------- driver
+def bench_operator(report, quick):
+    """The neural-operator layer: batching, the spectral route, and its adjoint.
+
+    Three questions, each with a baseline that somebody would actually use.
+    """
+    report.section(
+        "Neural-operator layer",
+        "The integral operator in the polynomial basis. `explicit kernel` means "
+        "forming `kappa(x_i, y_j)` and doing the quadrature sum directly, which "
+        "is what a naive kernel method does and what `kernel_gram` returns; the "
+        "spectral route never forms it. Note the first row: on a small grid the "
+        "spectral route is no faster and can be **slower**, because its "
+        "advantage is asymptotic in the discretisation rather than universal. "
+        "It is kept in the table for that reason.")
+
+    # -- 1. The spectral route versus forming the kernel, as the grid grows.
+    #
+    # Cost model: explicit is O(M*N) to build and apply a query-by-node kernel;
+    # spectral is O(N*n) to project, O(n^2) to mix and O(M*n) to reconstruct,
+    # with n modes. So the advantage is asymptotic in the discretisation, not
+    # universal, and the small-grid row is included precisely because it shows
+    # that.
+    #
+    # `R` and `Xq` are passed as ARGUMENTS, not closed over. Closed over, XLA
+    # constant-folds the whole kernel construction into a literal and the
+    # explicit route is timed doing almost nothing -- which flatters it and
+    # makes the comparison meaningless.
+    grids = [(14, 200), (50, 1000), (120, 5000)]
+    if not quick:
+        grids.append((300, 20000))
+
+    order = 10
+    for rule_size, n_query in grids:
+        layer = eqj.SpectralOperatorLayer([eqj.uniform_recurrence(rule_size)],
+                                          eqj.total_order_indices(1, order))
+        R = eqj.derivative_operator_tensor(layer)
+        u0 = layer.evaluate(jax.random.normal(jax.random.PRNGKey(0),
+                                              (layer.n_modes, 1)))
+        Xq = jnp.linspace(-0.99, 0.99, n_query).reshape(-1, 1)
+
+        spectral = jax.jit(lambda u, r, x: layer.integral(u, r, x))
+        explicit = jax.jit(
+            lambda u, r, x: layer.kernel_gram(x, layer.X, r)[:, :, 0, 0]
+            @ (layer.W * u[:, 0]))
+
+        spectral(u0, R, Xq)
+        explicit(u0, R, Xq)
+        t_spec, _ = measure(spectral, u0, R, Xq)
+        t_expl, _ = measure(explicit, u0, R, Xq)
+        gap = float(jnp.abs(spectral(u0, R, Xq)[:, 0]
+                            - explicit(u0, R, Xq)).max())
+        report.row("apply: %d nodes, %d query points" % (layer.X.shape[0], n_query),
+                   "%s (explicit kernel)" % _fmt(t_expl),
+                   _fmt(t_spec), "%.1fx" % (t_expl / t_spec),
+                   "same answer to %.0e" % gap)
+
+    # -- 2. Batching over input functions, and the adjoint.
+    orders = [6, 10] if quick else [6, 10, 16]
+    batch = 32 if quick else 128
+
+    for order in orders:
+        recurrences = [eqj.uniform_recurrence(order + 4)]
+        indices = eqj.total_order_indices(1, order)
+        layer = eqj.SpectralOperatorLayer(recurrences, indices)
+        n_modes = layer.n_modes
+        R = eqj.derivative_operator_tensor(layer)
+
+        coeffs = jax.random.normal(jax.random.PRNGKey(0), (batch, n_modes, 1))
+        U = jax.vmap(layer.evaluate)(coeffs)
+
+        loop = lambda: [layer.integral(U[i], R) for i in range(batch)]
+        batched = jax.jit(jax.vmap(lambda u: layer.integral(u, R)))
+        batched(U)                                        # warm the cache
+        t_loop, _ = measure(loop, repeat=3 if quick else 5)
+        t_vmap, _ = measure(batched, U, repeat=3 if quick else 5)
+        report.row("vmap over %d input functions (order %d)" % (batch, order),
+                   "%s (python loop)" % _fmt(t_loop),
+                   _fmt(t_vmap), "%.0fx" % (t_loop / t_vmap),
+                   "one function at a time is the obvious way to write it")
+
+        # Adjoint through the layer. R has n_modes^2 entries, so finite
+        # differences pay for every one of them and the gap grows as O(n^2).
+        u0 = U[0]
+        target = layer.integral(u0, R)
+
+        def loss(spectral_tensor):
+            params = {"spectral": spectral_tensor,
+                      "pointwise": jnp.zeros((1, 1)),
+                      "bias": jnp.zeros(1)}
+            return jnp.mean((layer.apply(u0, params) - target) ** 2)
+
+        grad_fn = jax.jit(jax.grad(loss))
+        loss_fn = jax.jit(loss)
+        grad_fn(R)
+        loss_fn(R)
+
+        n_params = n_modes * n_modes
+
+        def finite_differences():
+            eps = 1e-6
+            flat = np.array(R).reshape(-1)
+            out = np.zeros_like(flat)
+            for i in range(flat.size):
+                up = flat.copy(); up[i] += eps
+                dn = flat.copy(); dn[i] -= eps
+                out[i] = (float(loss_fn(jnp.asarray(up.reshape(R.shape))))
+                          - float(loss_fn(jnp.asarray(dn.reshape(R.shape))))) / (2 * eps)
+            return out
+
+        t_ad, _ = measure(grad_fn, R)
+        t_fd, _ = measure(finite_differences, repeat=1 if quick else 3)
+        agreement = np.abs(np.array(grad_fn(R)).reshape(-1)
+                           - finite_differences()).max()
+        report.row("d(loss)/dR, %d parameters (order %d)" % (n_params, order),
+                   "%s (finite diff)" % _fmt(t_fd),
+                   _fmt(t_ad), "%.0fx" % (t_fd / t_ad),
+                   "agree to %.1e" % agreement)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--quick", action="store_true",
@@ -317,6 +436,7 @@ def main(argv=None):
     bench_jit(report, args.quick)
     bench_vmap(report, args.quick)
     bench_gradients(report, args.quick)
+    bench_operator(report, args.quick)
     bench_versus_classic(report, args.quick)
 
     text = "\n".join(header) + report.render(

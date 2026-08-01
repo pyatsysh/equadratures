@@ -244,6 +244,24 @@ one extra evaluation, while finite differences pay per parameter:
 | 64 parameters | 22.9 ms | 106 us | 216x |
 | 256 parameters | 116 ms | 193 us | 600x |
 
+The same holds for the neural-operator layer, where the spectral tensor `R` has
+`n_modes²` entries and so finite differences scale badly: **513x** at 49
+parameters, **2048x** at 121, **3712x** at 289, agreeing to ~1e-14.
+
+Applying the operator has a second, structural saving — never forming the kernel
+`κ(x_i, y_j)`. That one is **asymptotic, not universal**, and the benchmark keeps
+the row that shows it losing:
+
+| apply | explicit kernel | spectral | speed-up |
+|---|---|---|---|
+| 14 nodes, 200 query points | 146 us | 169 us | **0.9x** |
+| 50 nodes, 1 000 query points | 252 us | 94 us | 2.7x |
+| 120 nodes, 5 000 query points | 1.87 ms | 210 us | 8.9x |
+| 300 nodes, 20 000 query points | 38.2 ms | 541 us | 70.6x |
+
+Explicit costs `O(M·N)`; spectral costs `O((M+N)·n + n²)`. On a coarse grid the
+overhead dominates and you should not bother.
+
 *(CPU-only box; the accelerator half of the story is untested here — see the
 caveat printed by the benchmark script.)*
 
