@@ -66,6 +66,22 @@ class TestJaxInverse(unittest.TestCase):
         return clean + self.noise * jax.random.normal(key, clean.shape)
 
     # ---------------------------------------------------------------- checks
+    def test_inverted_prior_bounds_are_rejected_at_construction(self):
+        """Fail where the mistake is, not deep inside the sampler.
+
+        Inverted bounds do fail without this check, but they fail as "Cannot
+        find valid initial parameters" from inside NUTS after a warm-up, which
+        points at the model rather than at the two numbers that are the wrong
+        way round. ``dist.Uniform(1, -1)`` constructs happily and returns NaN
+        from ``log_prob``, so nothing earlier catches it.
+        """
+        forward = lambda x: jnp.asarray([x[0] + x[1], x[0] - x[1]])
+        for lower, upper in (([1.0, 1.0], [-1.0, -1.0]),      # inverted
+                             ([0.0, 0.0], [0.0, 0.0])):       # degenerate
+            with self.assertRaises(ValueError):
+                eqi.surrogate_input_model(forward, jnp.zeros(2),
+                                          lower=lower, upper=upper)
+
     def test_surrogate_is_accurate(self):
         # The inference is only meaningful if the surrogate is exact first.
         Z = jnp.asarray(np.random.default_rng(0).uniform(-1, 1, size=(30, 3)))

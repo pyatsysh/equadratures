@@ -30,6 +30,7 @@ the base namespace never pulls in NumPyro. Import it explicitly::
 
     from equadratures.jax.inverse import surrogate_input_model, run_nuts
 """
+import numpy as np
 import jax
 import jax.numpy as jnp
 
@@ -85,6 +86,16 @@ def surrogate_input_model(forward, y_obs, lower, upper, noise_scale=None):
     lower = jnp.asarray(lower)
     upper = jnp.asarray(upper)
     y_obs = jnp.asarray(y_obs)
+
+    # Checked here rather than left to the sampler. Inverted bounds do fail, but
+    # they fail as "Cannot find valid initial parameters" from deep inside NUTS,
+    # after a warm-up, pointing at the model rather than at the two numbers that
+    # are the wrong way round. `dist.Uniform(1, -1)` builds happily and returns
+    # NaN from `log_prob`, so there is nothing earlier to catch it.
+    if jnp.any(upper <= lower):
+        raise ValueError(
+            "each upper bound must exceed its lower bound; got lower=%s, "
+            "upper=%s" % (np.asarray(lower).tolist(), np.asarray(upper).tolist()))
 
     def model():
         x = numpyro.sample("x", dist.Uniform(lower, upper).to_event(1))
