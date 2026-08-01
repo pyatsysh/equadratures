@@ -247,6 +247,25 @@ class TestNeuralOperatorStack(unittest.TestCase):
         np.testing.assert_allclose(np.array(got - zero),
                                    np.array(want - (a + b) * zero), atol=1e-10)
 
+    def test_stack_rejects_layers_on_different_quadratures(self):
+        """The docstring's "sharing one quadrature" is enforced, not assumed.
+
+        Different node counts would crash downstream anyway; the case that
+        matters is the same node count over a different measure, which would
+        compose silently wrong -- layer 2 treating layer 1's output samples as
+        its own nodes.
+        """
+        idx = eqj.total_order_indices(1, ORDER)
+        base = eqj.SpectralOperatorLayer([eqj.uniform_recurrence(8)], idx)
+        finer = eqj.SpectralOperatorLayer([eqj.uniform_recurrence(12)], idx)
+        hermite = eqj.SpectralOperatorLayer([eqj.hermite_recurrence(8)], idx)
+
+        with self.assertRaises(ValueError):
+            eqj.NeuralOperator([base, finer])          # different node count
+        with self.assertRaises(ValueError):
+            eqj.NeuralOperator([base, hermite])        # same count, silent case
+        eqj.NeuralOperator([base, base])               # shared rule is fine
+
     def test_stack_runs_with_activation_and_shapes_compose(self):
         layers = [_layer(c_in=1, c_out=4), _layer(c_in=4, c_out=1)]
         stack = eqj.NeuralOperator(layers)

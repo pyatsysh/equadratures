@@ -232,6 +232,20 @@ class NeuralOperator:
 
     def __init__(self, layers, activation=jax.nn.tanh):
         self.layers = list(layers)
+        # "Sharing one quadrature" is a requirement, not a suggestion: each
+        # layer projects its input at its *own* nodes, so a stack over
+        # different rules hands layer k+1 samples taken at points it will
+        # treat as its own. With different node counts that is a shape error;
+        # with equal counts but different nodes it is silently wrong output,
+        # which is the worse failure. Hence the check.
+        first = self.layers[0].X if self.layers else None
+        for i, layer in enumerate(self.layers[1:], start=1):
+            if (layer.X.shape != first.shape
+                    or bool(jnp.any(jnp.abs(layer.X - first) > 1e-12))):
+                raise ValueError(
+                    "layer %d uses a different quadrature from layer 0; a "
+                    "NeuralOperator stack must share one rule, because each "
+                    "layer re-projects at its own nodes" % i)
         self.activation = activation
 
     def init_params(self, key):
@@ -281,7 +295,7 @@ def effective_spectral_tensor(layer, params):
     return dense + jnp.einsum("jk,oi->jkoi", jnp.eye(n), params["pointwise"])
 
 
-def linear_operator_tensor(layer, operator, Xq=None):
+def linear_operator_tensor(layer, operator):
     """The exact spectral tensor of a known linear operator, for ``mode="dense"``.
 
     Computes ``R_{jk} = <phi_j, A phi_k>`` by the layer's own quadrature, which
