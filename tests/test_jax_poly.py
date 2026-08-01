@@ -68,6 +68,44 @@ class TestJaxPoly(unittest.TestCase):
         self.assertAlmostEqual(float(poly.mean()), 1.0, places=8)
         self.assertAlmostEqual(float(poly.variance()), 7.0 / 3.0, places=8)
 
+    def test_sobol_indices_are_nan_for_a_model_with_no_variance(self):
+        """A constant model must not produce confident-looking indices.
+
+        This is the failure worth guarding: a Sobol' index is a *fraction* of
+        the variance, and a constant model has variance at round-off rather than
+        exactly zero. Dividing one round-off quantity by another used to return
+        ``[0.457, 0.534]`` -- numbers that sum to about one and look entirely
+        publishable while meaning nothing. NaN propagates where that does not.
+        """
+        rec = [eqj.uniform_recurrence(4)] * 2
+        idx = eqj.total_order_indices(2, 2)
+        X, W = eqj.tensor_quadrature(rec)
+        poly = eqj.Poly(rec, idx)
+        poly.fit_projection(X, jnp.ones(X.shape[0]), W)
+
+        self.assertLess(float(poly.variance()), 1e-25)
+        self.assertTrue(bool(jnp.all(jnp.isnan(poly.sobol_indices()))))
+        self.assertTrue(bool(jnp.all(jnp.isnan(poly.total_sobol_indices()))))
+
+    def test_sobol_indices_survive_a_small_but_genuine_variance(self):
+        """The guard must not reject real signal, which is the harder half.
+
+        A coefficient of 1e-9 against a mean of 1 is seven orders above
+        round-off and perfectly well determined, even though the resulting
+        variance (~3e-19) is tiny. An earlier version of the threshold compared
+        variance against a scale dominated by the mean and wrongly called this
+        noise; the comparison is made in coefficient units for that reason.
+        """
+        rec = [eqj.uniform_recurrence(4)] * 2
+        idx = eqj.total_order_indices(2, 2)
+        X, W = eqj.tensor_quadrature(rec)
+        poly = eqj.Poly(rec, idx)
+        poly.fit_projection(X, 1.0 + 1e-9 * X[:, 0], W)
+
+        S = poly.sobol_indices()
+        self.assertFalse(bool(jnp.any(jnp.isnan(S))))
+        np.testing.assert_allclose(np.array(S), [1.0, 0.0], atol=1e-6)
+
     def test_sobol_indices(self):
         # f = 1 + 2 x1 + 3 x1 x2 : var = 7/3, main-effect(x1) = 4/3, interaction = 1.
         # S1 = (4/3)/(7/3) = 4/7 ; S2 = 0 ; T1 = 1 ; T2 = (1)/(7/3) = 3/7.

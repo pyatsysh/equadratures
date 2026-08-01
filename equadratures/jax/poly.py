@@ -148,15 +148,48 @@ class Poly:
         """Variance of the expansion (``sum_{k>0} c_k^2``; Parseval)."""
         return jnp.sum(self.coefficients[1:] ** 2)
 
+    def _sobol_denominator(self, c2):
+        """Variance to divide by, or NaN when it is not meaningfully non-zero.
+
+        A Sobol' index is a *fraction* of the variance, so it is undefined for a
+        model with no variance -- and a constant model does not have variance
+        exactly zero, it has variance at round-off. Dividing one round-off
+        quantity by another returns numbers that look entirely reasonable: a
+        constant fitted on a 2-D grid gives ``[0.457, 0.534]``, which sums to
+        about one and means nothing at all.
+
+        That is the dangerous failure, worse than a crash, because a reader has
+        no way to tell it from a real answer. So the ratio is only formed when
+        the variance is genuinely resolved, and NaN is returned otherwise --
+        NaN propagates visibly where 0.457 does not.
+
+        The comparison is made in **coefficient units, not variance units**,
+        which matters more than it looks. Testing ``variance > eps * sum(c^2)``
+        seems natural and is wrong: that scale is dominated by the *mean*, so a
+        model with a small but perfectly well-determined variation -- a
+        coefficient of 1e-9 against a mean of 1, seven orders above round-off --
+        gets rejected as noise. Comparing ``sqrt(variance)`` against
+        ``sqrt(scale)`` instead asks the right question, which is whether the
+        individual coefficients stand above round-off. The factor of 100 is
+        slack for error accumulated across the terms of the sum.
+        """
+        variance = jnp.sum(c2[1:])
+        scale = jnp.sum(c2)
+        floor = (100.0 * jnp.finfo(c2.dtype).eps) ** 2 * scale
+        return jnp.where(variance > floor, variance, jnp.nan)
+
     def sobol_indices(self):
         """First-order Sobol' indices, one per dimension.
 
         ``S_i`` is the fraction of the variance explained by basis terms that
         depend on dimension ``i`` *alone*. Differentiable w.r.t. the coefficients
         (hence w.r.t. the training data) -- a differentiable UQ output.
+
+        Returns NaN for every index when the model has no meaningful variance;
+        see :meth:`_sobol_denominator` for why that is better than a number.
         """
         c2 = self.coefficients ** 2
-        var = jnp.sum(c2[1:])
+        var = self._sobol_denominator(c2)
         total_deg = self.indices.sum(axis=1)
         S = []
         for i in range(self.indices.shape[1]):
@@ -166,9 +199,13 @@ class Poly:
 
     def total_sobol_indices(self):
         """Total-effect Sobol' indices: variance fraction from *all* terms that
-        involve dimension ``i`` (main effect plus every interaction)."""
+        involve dimension ``i`` (main effect plus every interaction).
+
+        NaN for a model with no meaningful variance, as for
+        :meth:`sobol_indices`.
+        """
         c2 = self.coefficients ** 2
-        var = jnp.sum(c2[1:])
+        var = self._sobol_denominator(c2)
         T = []
         for i in range(self.indices.shape[1]):
             has_i = jnp.asarray(self.indices[:, i] > 0)

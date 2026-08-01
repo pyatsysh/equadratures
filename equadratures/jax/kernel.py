@@ -53,7 +53,17 @@ class PolynomialKernel:
 
 
 def gp_nlml(kernel, X, y, log_theta, log_noise):
-    """Negative log marginal likelihood of a GP with ``kernel`` (Cholesky-based)."""
+    """Negative log marginal likelihood of a GP with ``kernel`` (Cholesky-based).
+
+    ``log_noise`` must be finite and the noise genuinely positive whenever there
+    are more training points than kernel features. This kernel has **finite rank
+    ``n_features``**, so with more points than that the Gram matrix is singular
+    by construction -- measured directly: 8 points against 5 features gives a
+    smallest eigenvalue of −5e-15. The noise term is what makes the Cholesky
+    factorisation well-posed, and passing ``log_noise = -inf`` returns NaN rather
+    than raising. That is a property of a finite-rank Mercer kernel and not a
+    defect here, but it is worth knowing before debugging a NaN loss.
+    """
     m = X.shape[0]
     K = kernel.gram(X, X, log_theta) + jnp.exp(log_noise) * jnp.eye(m)
     L = jnp.linalg.cholesky(K)
