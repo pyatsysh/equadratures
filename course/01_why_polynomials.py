@@ -268,8 +268,8 @@ print("error at degree 24:", errors[-1])
 #
 # 1. Change `expensive_model` to `lambda x: np.abs(x)` and re-run the convergence
 #    study. Does the error still fall exponentially? Why not?
-# 2. Redo §1.4 with Chebyshev points, `cos(pi k / n)`. Do they also fix Runge?
-# 3. At which degree does the surrogate in §1.6 first reach an error below 1e-6?
+# 2. Redo Section 1.4 with Chebyshev points, `cos(pi k / n)`. Do they also fix Runge?
+# 3. At which degree does the surrogate in Section 1.6 first reach an error below 1e-6?
 #
 # Solutions below.
 

@@ -259,7 +259,8 @@ print("beta[0]**2 :", float(bb[0] ** 2), " = Var[X]")
 #
 # ## Exercises
 #
-# 1. How many Gauss points integrate $x^{11}$ exactly? Check it.
+# 1. How many Gauss points integrate $x^{12}$ exactly? Check it. Then try
+#    $x^{11}$ with too few points, and work out why it comes out exact anyway.
 # 2. Integrate the non-smooth `|x|` with Gauss rules of growing size. Does the
 #    error fall as fast as it did for the smooth integrand?
 # 3. Build a rule for a truncated Gaussian on `[-2, 2]` and compute `E[X^2]`.
@@ -271,13 +272,21 @@ print("beta[0]**2 :", float(bb[0] ** 2), " = Var[X]")
 if __name__ == "__main__":
     print("\n--- Solutions ---")
 
-    # 1. Need 2n-1 >= 11, so n >= 6.
-    for nn in (5, 6):
+    # 1. Need 2n-1 >= 12, so n >= 7.  (E[x^12] on U(-1,1) is 1/13.)
+    for nn in (6, 7):
         nd, wt = eqj.gauss_quadrature(*eqj.uniform_recurrence(nn))
-        err = abs(float(jnp.sum(wt * nd ** 11)) - 0.0)
-        print(f"1. n={nn}: error integrating x^11 = {err:.2e} "
+        err = abs(float(jnp.sum(wt * nd ** 12)) - 1.0 / 13.0)
+        print(f"1. n={nn}: error integrating x^12 = {err:.2e} "
               f"({'exact' if err < 1e-14 else 'NOT exact'})")
-    print("   2n-1 >= 11 needs n >= 6, and that is exactly where it becomes exact.")
+    print("   2n-1 >= 12 needs n >= 7, and that is exactly where it becomes exact.")
+    # The odd power is a trap: symmetry, not exactness, is doing the work.
+    nd, wt = eqj.gauss_quadrature(*eqj.uniform_recurrence(3))
+    err11 = abs(float(jnp.sum(wt * nd ** 11)) - 0.0)
+    print(f"   but n=3 integrates x^11 to {err11:.2e} — 'exact' with 2n-1 = 5.")
+    print("   Gauss nodes and weights are symmetric about 0 for a symmetric")
+    print("   measure, so ANY odd integrand cancels in pairs and returns 0,")
+    print("   which is the right answer for the wrong reason. Test exactness")
+    print("   claims on even powers; odd ones cannot fail.")
 
     # 2. |x| has a kink; exactness arguments need smoothness.
     print("2. |x| on [-1,1], exact value 0.5:")

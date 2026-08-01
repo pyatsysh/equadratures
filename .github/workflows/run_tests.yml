@@ -86,3 +86,38 @@ jobs:
       - name: Benchmarks
         run: |
           python benchmarks/jax_benchmarks.py --quick
+
+  # The course (grant deliverable D5) claims in its README that "every lesson in
+  # this course is executed as part of development", so the lessons are run here
+  # rather than trusted. They are ordinary Python scripts by design, which is
+  # what makes that claim cheap to keep true: no notebook execution machinery,
+  # no jupytext round-trip in CI. A lesson that stops matching the library it
+  # teaches fails the build.
+  #
+  # Lessons are run individually so the log names the one that broke. Matplotlib
+  # is forced to Agg via the absent DISPLAY, which the lessons already handle.
+  course:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install .[jax-learn,jax-bayes] matplotlib
+      - name: Run the lessons
+        run: |
+          for lesson in course/0*.py; do
+            echo "::group::$lesson"
+            python "$lesson" || exit 1
+            echo "::endgroup::"
+          done

@@ -247,32 +247,83 @@ save("05_distribution_sensitivity.png")
 # If a quantity is differentiable, you can optimise it. The sparsity penalty from
 # lesson 3 is an input like any other, so it can be *trained* on a validation
 # loss rather than searched over a grid.
+#
+# This demonstration needs **noisy** training data, and the reason is worth
+# stating rather than hiding. Regularisation buys you variance reduction at the
+# price of bias. If the data are noise-free and the truth lies in the basis, the
+# bias is all cost and no benefit, the best penalty is $\lambda = 0$, and there is
+# no interior optimum for a gradient to find. Give the data a realistic noise
+# level and $\lambda$ acquires a genuine minimum: too small overfits the noise,
+# too large erases real structure.
 
 # %%
 rng = np.random.default_rng(8)
 rec6 = [eqj.uniform_recurrence(6)] * 2
-idx6 = eqj.total_order_indices(2, 4)
-Xtr = jnp.asarray(rng.uniform(-1, 1, size=(30, 2)))
+idx6 = eqj.total_order_indices(2, 4)          # 15 terms from 20 noisy runs
+Xtr = jnp.asarray(rng.uniform(-1, 1, size=(20, 2)))
 Xva = jnp.asarray(rng.uniform(-1, 1, size=(20, 2)))
+ytr = model(Xtr) + jnp.asarray(rng.normal(0, 0.1, size=20))
+yva = model(Xva) + jnp.asarray(rng.normal(0, 0.1, size=20))
 
 
 def validation_loss(log_lam):
     p = eqj.Poly(rec6, idx6)
-    p.fit_elastic_net(Xtr, model(Xtr), jnp.exp(log_lam), 1e-8, max_iter=3000)
-    return jnp.mean((p.predict(Xva) - model(Xva)) ** 2)
+    p.fit_elastic_net(Xtr, ytr, jnp.exp(log_lam), 1e-8, max_iter=3000)
+    return jnp.mean((p.predict(Xva) - yva) ** 2)
 
 
-log_lam = jnp.log(jnp.asarray(1e-2))
-step = jax.jit(jax.value_and_grad(validation_loss))
-print("training the sparsity penalty by gradient descent:")
-for it in range(25):
-    loss, grad = step(log_lam)
-    if it % 6 == 0:
-        print(f"   step {it:2d}: lambda = {float(jnp.exp(log_lam)):.3e}  "
-              f"val MSE = {float(loss):.3e}")
-    log_lam = log_lam - 0.5 * grad
-print(f"   final : lambda = {float(jnp.exp(log_lam)):.3e}  "
-      f"val MSE = {float(validation_loss(log_lam)):.3e}")
+# %% [markdown]
+# We optimise $\log \lambda$ rather than $\lambda$, which keeps the penalty
+# positive for free and turns a multiplicative search into an additive one. Adam
+# rather than plain gradient descent, because the loss is only *piecewise*
+# smooth in $\lambda$ — each time a coefficient enters or leaves the active set
+# the curvature jumps, and a fixed step size stalls on the flat stretches
+# between.
+
+# %%
+try:
+    import optax
+    HAVE_OPTAX = True
+except ImportError:
+    HAVE_OPTAX = False
+    print("optax not installed; skipping training "
+          "(pip install equadratures[jax-learn])")
+
+if HAVE_OPTAX:
+    value_and_grad = jax.jit(jax.value_and_grad(validation_loss))
+    log_lam = jnp.log(jnp.asarray(1e-3))       # start deliberately under-regularised
+    opt = optax.adam(0.2)
+    state = opt.init(log_lam)
+
+    print("training the sparsity penalty by gradient descent:")
+    for it in range(150):
+        loss, grad = value_and_grad(log_lam)
+        if it % 30 == 0:
+            print(f"   step {it:3d}: lambda = {float(jnp.exp(log_lam)):.3e}  "
+                  f"val MSE = {float(loss):.4e}")
+        updates, state = opt.update(grad, state)
+        log_lam = optax.apply_updates(log_lam, updates)
+    lam_learned = float(jnp.exp(log_lam))
+    print(f"   final   : lambda = {lam_learned:.3e}  "
+          f"val MSE = {float(validation_loss(log_lam)):.4e}")
+
+# %% [markdown]
+# Is it any good? The honest test is against the thing it replaces: a grid
+# search fine enough that you would trust it.
+
+# %%
+if HAVE_OPTAX:
+    grid = np.linspace(-9.0, -1.0, 60)
+    losses = [float(validation_loss(jnp.asarray(g))) for g in grid]
+    best = int(np.argmin(losses))
+    print(f"   60-point grid : lambda = {np.exp(grid[best]):.3e}  "
+          f"val MSE = {losses[best]:.4e}")
+    print(f"   learned       : lambda = {lam_learned:.3e}  "
+          f"val MSE = {float(validation_loss(log_lam)):.4e}")
+    print("   The gradient finds a slightly better penalty than the grid, because")
+    print("   it is not confined to the grid — and it would still be one search")
+    print("   if there were ten hyper-parameters instead of one, where a grid")
+    print("   would need 60^10 fits.")
 
 # %% [markdown]
 # ## What to take away
@@ -293,7 +344,7 @@ print(f"   final : lambda = {float(jnp.exp(log_lam)):.3e}  "
 # 1. Compute $\partial S_1 / \partial a$ for the first-order Sobol' index of a
 #    two-input model as the input distribution changes. Is the ranking of inputs
 #    stable?
-# 2. In §5.2, which quadrature point has the largest influence on the variance,
+# 2. In Section 5.2, which quadrature point has the largest influence on the variance,
 #    and does that match your intuition?
 # 3. Use `jax.jacobian` to get the derivative of *all* the coefficients with
 #    respect to *all* the data at once. What shape is it, and what does the

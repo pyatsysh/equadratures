@@ -293,7 +293,7 @@ if HAVE_NUMPYRO:
 #
 # 1. Retrain the kernel with only 5 data points. What happens to the learned
 #    spectrum, and is that the right behaviour?
-# 2. Widen the observation noise in §6.5 from 0.02 to 0.2. How much does the
+# 2. Widen the observation noise in Section 6.5 from 0.02 to 0.2. How much does the
 #    posterior widen? Does it still cover the truth?
 # 3. The polynomial kernel has finite rank. Predict what its posterior variance
 #    does far from the data, and check whether you were right.

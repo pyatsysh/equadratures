@@ -251,7 +251,7 @@ print("  both keep", int(jnp.count_nonzero(debiased.coefficients)), "terms")
 #
 # 1. For `d=6`, what order can you afford on a budget of 200 runs using a
 #    total-order basis and least squares (say, twice as many runs as terms)?
-# 2. Add noise to the model outputs and re-run §3.5. Does sparse recovery
+# 2. Add noise to the model outputs and re-run Section 3.5. Does sparse recovery
 #    survive?
 # 3. Compare `fit_lasso` with `fit_ridge` at matched sparsity. Why does ridge
 #    never produce exact zeros?
