@@ -127,6 +127,28 @@ class TestJaxQuadrature(unittest.TestCase):
         np.testing.assert_allclose(np.array(beta), np.array(b_ref), atol=1e-10)
         self.assertAlmostEqual(float(mu0), float(mu0_ref), places=12)
 
+    def test_stieltjes_refuses_more_terms_than_the_measure_supports(self):
+        """Past the support size the recurrence returns noise, not an error.
+
+        A measure on m points admits at most m orthonormal polynomials. Ask for
+        more and the exhausted beta comes out at zero while the ones after it
+        come back non-zero from round-off -- and the quadrature rule built from
+        them has positive weights summing correctly, so nothing downstream
+        objects. Measured with 4 nodes and 8 terms, the last three betas were
+        0.956, 0.195 and 0.341, all noise. Hence the guard.
+        """
+        nodes = jnp.linspace(-1.0, 1.0, 4)
+        weights = jnp.full(4, 0.25)
+
+        # Up to the support size is fine.
+        for n in (2, 3, 4):
+            alpha, beta, mu0 = eqj.stieltjes_recurrence(nodes, weights, n)
+            self.assertEqual(alpha.shape[0], n)
+
+        for n in (5, 8):
+            with self.assertRaises(ValueError):
+                eqj.stieltjes_recurrence(nodes, weights, n)
+
     def test_stieltjes_differentiable(self):
         # Coefficients differentiable w.r.t. the measure weights (autodiff vs FD).
         n = 4

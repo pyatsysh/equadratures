@@ -81,14 +81,37 @@ def stieltjes_recurrence(nodes, weights, n):
     beta : jax.numpy.ndarray, shape (n-1,)
     mu0 : jax.numpy.ndarray, scalar
 
+    Raises
+    ------
+    ValueError
+        If ``n`` exceeds the number of support points. A measure supported on
+        ``m`` points admits at most ``m`` orthonormal polynomials -- the next one
+        would have to vanish at every one of them -- and past that the recurrence
+        breaks down. It does not break down *loudly*: the exhausted ``beta``
+        comes out at zero and the ones after it come back non-zero, from
+        round-off, and the resulting quadrature rule has positive weights summing
+        correctly to ``mu0``. Measured with 4 nodes and 8 requested terms:
+        ``beta = [0.745, 0.596, 0.447, 0.0, 0.956, 0.195, 0.341]``, of which the
+        last three are noise wearing a plausible costume. Hence the check.
+
     Notes
     -----
     Accurate to order ``n`` only if the discretisation integrates polynomials up
     to degree ``2n-1`` well enough (e.g. an ``M>=n`` point Gauss rule makes the
     first ``n`` coefficients exact).
+
+    The check above counts support *points*, not distinct ones. A measure with
+    repeated nodes, or with some weights at zero, supports fewer polynomials
+    than it has entries, and that case is not detected here.
     """
     x = jnp.asarray(nodes)
     w = jnp.asarray(weights)
+    if int(n) > x.shape[0]:
+        raise ValueError(
+            "cannot build %d recurrence coefficients from a measure supported "
+            "on %d points: at most %d orthonormal polynomials exist, and past "
+            "that the recurrence returns round-off that looks like data"
+            % (int(n), x.shape[0], x.shape[0]))
     mu0 = jnp.sum(w)
 
     alpha = [jnp.sum(w * x) / mu0]        # alpha_0 = weighted mean
