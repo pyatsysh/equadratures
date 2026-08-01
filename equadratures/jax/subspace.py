@@ -55,11 +55,23 @@ def orthonormalise(A):
     sign of each column of ``Q`` free, and letting it flip mid-optimisation puts
     a discontinuity in the middle of the loss.
 
+    Raises if asked for more columns than rows. A thin QR would quietly return
+    ``min(d, r)`` columns instead, which is not an error anywhere downstream --
+    it just produces a model on fewer latent variables than the caller asked
+    for, silently.
+
     Optimising over this parameterisation rather than on the Stiefel manifold
     directly means the constraint is satisfied by construction and any ordinary
     optimiser will do -- no manifold machinery, no retraction step. The classic
     namespace reaches for ``pymanopt`` for this.
     """
+    if A.ndim != 2:
+        raise ValueError("expected a 2-D matrix, got shape %r" % (A.shape,))
+    if A.shape[1] > A.shape[0]:
+        raise ValueError(
+            "cannot orthonormalise %d columns in %d dimensions: a subspace "
+            "cannot have more directions than the space containing it"
+            % (A.shape[1], A.shape[0]))
     Q, R = jnp.linalg.qr(A)
     return Q * jnp.sign(jnp.diag(R))
 
@@ -138,6 +150,21 @@ class PolynomialRidge:
         Hermite, which is the natural choice: the latent coordinates are
         standardised to zero mean and unit variance below, and for Gaussian
         inputs an orthonormal projection of them is standard normal exactly.
+    regularisation : float, optional
+        Relative Tikhonov floor on the inner least-squares solve. **Default 0**,
+        which uses an exact `lstsq` and is what you want for a well-posed
+        problem: on a genuine ridge function it recovers the subspace to about
+        1e-16, and any floor above zero costs digits.
+
+        Raise it only if the design is rank-deficient -- fewer distinct sample
+        points than basis terms, duplicated rows, or a projection that collapses
+        the latent coordinate. There, `lstsq` produces a **NaN gradient** (the
+        SVD derivative is undefined with repeated singular values), so the fit
+        silently poisons on the next step. ``1e-10`` restores finite gradients
+        and costs roughly ten digits of residual, which on an ill-posed problem
+        you did not have anyway. This is deliberately not the default: paying
+        that everywhere to protect against a pathological input would be the
+        wrong trade.
 
     Notes
     -----
@@ -148,9 +175,19 @@ class PolynomialRidge:
     everywhere. The classic implementation uses min/max.
     """
 
-    def __init__(self, dimensions, subspace_dimension, order, recurrence=None):
+    def __init__(self, dimensions, subspace_dimension, order, recurrence=None,
+                 regularisation=0.0):
+        if int(subspace_dimension) > int(dimensions):
+            raise ValueError(
+                "subspace_dimension (%d) cannot exceed dimensions (%d)"
+                % (int(subspace_dimension), int(dimensions)))
+        if int(subspace_dimension) < 1:
+            raise ValueError("subspace_dimension must be at least 1")
+        if float(regularisation) < 0.0:
+            raise ValueError("regularisation must be non-negative")
         self.dimensions = int(dimensions)
         self.subspace_dimension = int(subspace_dimension)
+        self.regularisation = float(regularisation)
         self.order = int(order)
         self.indices = total_order_indices(self.subspace_dimension, self.order)
         if recurrence is None:
@@ -161,12 +198,37 @@ class PolynomialRidge:
 
     # ------------------------------------------------------------- internals
 
+    _VARIANCE_FLOOR = 1e-12
+
+    @classmethod
+    def _standardise(cls, Z):
+        """Centre and scale, with a gradient that survives zero variance.
+
+        The floor goes **inside** the square root. Writing ``std(z) + eps``
+        looks equivalent and is not: ``d sqrt(v)/dv`` is unbounded at ``v = 0``,
+        so a latent coordinate with no spread -- constant data, or a projection
+        that collapses -- produces a NaN gradient and poisons the whole fit on
+        the very next step. ``sqrt(v + eps)`` is finite everywhere.
+        """
+        centred = Z - Z.mean(axis=0)
+        scale = jnp.sqrt(jnp.mean(centred ** 2, axis=0) + cls._VARIANCE_FLOOR)
+        return centred / scale
+
     def _latent_design(self, A, X):
         """Design matrix on the standardised latent coordinates."""
         U = orthonormalise(A)
         Z = jnp.asarray(X) @ U                              # (m, r)
-        Z = (Z - Z.mean(axis=0)) / (Z.std(axis=0) + 1e-12)
-        return design_matrix(Z, self.indices, self.recurrences), U
+        return design_matrix(self._standardise(Z), self.indices,
+                             self.recurrences), U
+
+    def _solve(self, V, y):
+        """Inner least squares, exact by default and floored when asked."""
+        if self.regularisation == 0.0:
+            return jnp.linalg.lstsq(V, y, rcond=None)[0]
+        n = V.shape[1]
+        gram = V.T @ V
+        floor = self.regularisation * jnp.trace(gram) / n
+        return jnp.linalg.solve(gram + floor * jnp.eye(n, dtype=V.dtype), V.T @ y)
 
     def loss(self, A, X, y):
         """Variable-projection residual: coefficients eliminated in closed form.
@@ -177,9 +239,9 @@ class PolynomialRidge:
         Gauss-Newton Jacobian is written to avoid.
         """
         V, _ = self._latent_design(A, X)
-        coefficients = jnp.linalg.lstsq(V, jnp.asarray(y), rcond=None)[0]
-        residual = V @ coefficients - jnp.asarray(y)
-        return jnp.mean(residual ** 2)
+        y = jnp.asarray(y)
+        coefficients = self._solve(V, y)
+        return jnp.mean((V @ coefficients - y) ** 2)
 
     # ------------------------------------------------------------------- API
 
@@ -219,7 +281,7 @@ class PolynomialRidge:
 
         self.U = orthonormalise(A)
         V, _ = self._latent_design(A, X)
-        self.coefficients = jnp.linalg.lstsq(V, y, rcond=None)[0]
+        self.coefficients = self._solve(V, y)
         self._A = A
         self._fit_X = X
         return np.asarray(history)
@@ -234,7 +296,7 @@ class PolynomialRidge:
         if self.coefficients is None:
             raise RuntimeError("call fit() before predict()")
         Z_train = self._fit_X @ self.U
-        mean = Z_train.mean(axis=0)
-        std = Z_train.std(axis=0) + 1e-12
-        Z = (jnp.asarray(X) @ self.U - mean) / std
+        centred = Z_train - Z_train.mean(axis=0)
+        scale = jnp.sqrt(jnp.mean(centred ** 2, axis=0) + self._VARIANCE_FLOOR)
+        Z = (jnp.asarray(X) @ self.U - Z_train.mean(axis=0)) / scale
         return design_matrix(Z, self.indices, self.recurrences) @ self.coefficients

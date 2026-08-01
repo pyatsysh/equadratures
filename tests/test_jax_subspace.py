@@ -177,6 +177,58 @@ class TestPolynomialRidge(unittest.TestCase):
             self.assertAlmostEqual(float(grad[i, 0]), fd,
                                    delta=1e-5 * max(1.0, abs(fd)))
 
+    def test_rejects_a_subspace_larger_than_the_space(self):
+        """A thin QR would silently return fewer columns and fit a wrong model.
+
+        With d=3 and r=5 the QR returns 3 columns, `design_matrix` then quietly
+        ignores latent dimensions it was not given, and the caller gets a
+        rank-deficient fit on 3 latent variables while believing they asked for
+        5. Nothing raises anywhere downstream, so it has to raise here.
+        """
+        with self.assertRaises(ValueError):
+            eqj.PolynomialRidge(dimensions=3, subspace_dimension=5, order=2)
+        with self.assertRaises(ValueError):
+            eqj.PolynomialRidge(dimensions=3, subspace_dimension=0, order=2)
+        with self.assertRaises(ValueError):
+            eqj.orthonormalise(jax.random.normal(jax.random.PRNGKey(0), (3, 5)))
+
+    def test_zero_variance_latent_coordinate_has_a_finite_gradient(self):
+        """The standardisation floor must go inside the square root.
+
+        ``std(z) + eps`` and ``sqrt(var(z) + eps)`` agree in value and differ
+        completely in derivative: ``d sqrt(v)/dv`` is unbounded at zero, so a
+        collapsed latent coordinate gives a NaN gradient with the first form.
+        """
+        model = eqj.PolynomialRidge(dimensions=4, subspace_dimension=1, order=2)
+        Z = jnp.zeros((10, 1))
+        grad = jax.grad(lambda z: jnp.sum(model._standardise(z)))(Z)
+        self.assertTrue(bool(jnp.all(jnp.isfinite(grad))))
+
+    def test_regularisation_rescues_a_rank_deficient_design(self):
+        """Documented behaviour, both halves of it.
+
+        Default (exact `lstsq`) gives NaN on a rank-deficient design, because
+        the SVD derivative is undefined with repeated singular values. That is
+        stated in the docstring rather than papered over, since the fix costs
+        accuracy on every well-posed problem. Opting in restores finite
+        gradients.
+        """
+        rng = np.random.default_rng(0)
+        X = jnp.zeros((30, 4))                      # every point identical
+        y = jnp.asarray(rng.normal(size=30))
+
+        exact = eqj.PolynomialRidge(4, 1, 2)
+        self.assertFalse(bool(np.all(np.isfinite(exact.fit(X, y, steps=10)))))
+
+        floored = eqj.PolynomialRidge(4, 1, 2, regularisation=1e-10)
+        self.assertTrue(bool(np.all(np.isfinite(floored.fit(X, y, steps=10)))))
+
+    def test_regularisation_does_not_spoil_a_well_posed_fit(self):
+        u, X, y = _ridge_problem(d=8, m=300, seed=0)
+        model = eqj.PolynomialRidge(8, 1, 3, regularisation=1e-10)
+        model.fit(X, y, steps=800, learning_rate=0.2)
+        self.assertLess(float(eqj.subspace_distance(model.U, u)), 1e-8)
+
     def test_fit_is_jittable_end_to_end(self):
         u, X, y = _ridge_problem(d=5, m=150, seed=10)
         model = eqj.PolynomialRidge(dimensions=5, subspace_dimension=1, order=2)
