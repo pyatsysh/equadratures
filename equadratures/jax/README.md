@@ -246,6 +246,8 @@ same subspace and the same model, so an elementwise comparison measures the
 rotation an optimiser happened to land on. Use `subspace_distance`. (Same trap as
 the spectral/pointwise split in section 6, in different clothes.)
 
+Worked script: `examples/jax_dimension_reduction.py`.
+
 ## 8. Bayesian inference — NUTS straight through the surrogate
 
 Gradient-based samplers need `d(log density)/d(parameters)` through the forward
