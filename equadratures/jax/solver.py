@@ -210,7 +210,6 @@ def lasso_debiased(A, y, lam, max_iter=DEFAULT_MAX_ITER):
     c_l1 = jax.lax.stop_gradient(lasso(A, y, lam, max_iter))
     mask = (c_l1 != 0.0).astype(A.dtype)
 
-    n = A.shape[1]
     M = mask[:, None] * mask[None, :]
     H = M * (A.T @ A) + jnp.diag(1.0 - mask)
     return jnp.linalg.solve(H, mask * (A.T @ y))

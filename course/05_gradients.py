@@ -153,7 +153,7 @@ def timing_experiment(m):
     grad_fn(ym).block_until_ready(); val_fn(ym).block_until_ready()
 
     t0 = time.perf_counter()
-    g_ad = np.array(grad_fn(ym)); g_ad_ = grad_fn(ym).block_until_ready()
+    g_ad = np.array(grad_fn(ym)); grad_fn(ym).block_until_ready()
     t_ad = time.perf_counter() - t0
 
     t0 = time.perf_counter()

@@ -17,7 +17,6 @@ Three demonstrations, in increasing order of how much they need training:
 Run:  python examples/jax_neural_operator.py
 Requires: pip install equadratures[jax-learn]     (optax, for demo 3 only)
 """
-import numpy as np
 import jax
 import jax.numpy as jnp
 

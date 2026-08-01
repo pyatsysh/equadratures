@@ -15,7 +15,6 @@ it into a learnable kernel for GP / kernel regression.
 Pure JAX; no optimiser dependency here (train with Optax or plain ``jax.grad``).
 """
 import numpy as np
-import jax
 import jax.numpy as jnp
 import jax.scipy.linalg as jsl
 

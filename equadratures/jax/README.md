@@ -84,7 +84,7 @@ poly.total_sobol_indices()  # [1, 3/7]
 ```
 
 `fit` (least squares), `fit_ridge` (Tikhonov), `fit_lasso`,
-`fit_lasso_debiased` and `fit_elastic_net` are also available — see §4.
+`fit_lasso_debiased` and `fit_elastic_net` are also available — see section 4.
 
 ## 3. Differentiate through *anything*
 
